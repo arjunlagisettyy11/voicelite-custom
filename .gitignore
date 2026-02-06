@@ -112,3 +112,12 @@ coverage/
 
 # Security audit documents (keep local only)
 SECURITY-AUDIT-*.md
+
+# CUDA whisper binaries (user-provided, too large for git)
+whisper-cuda/
+
+# LLaMA / Ollama model files and binaries (user-provided)
+VoiceLite/llama/
+
+# IDE configuration (user-specific paths and preferences)
+.vscode/

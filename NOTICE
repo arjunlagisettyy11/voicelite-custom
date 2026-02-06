@@ -1,0 +1,80 @@
+VoiceLite Custom Fork
+=====================
+
+This project is a fork of VoiceLite by Mikhail Lev (mikha08-rgb).
+
+Original repository: https://github.com/mikha08-rgb/VoiceLite
+Original license: MIT License
+Original copyright: (c) 2025 Mikhail Lev
+
+
+Authors
+-------
+
+Mikhail Lev <mikha08-rgb>
+  - Original VoiceLite application
+  - Desktop WPF app (.NET 8), whisper.cpp integration, audio pipeline
+  - Web backend (Next.js 15, Stripe, Prisma)
+  - 1,000+ commits of core development
+
+Arjun Lagisetty <arjunlagisettyy11>
+  - Fork maintainer and enhancements below
+
+Claude (Anthropic AI assistant)
+  - Co-authored implementation of fork enhancements
+
+
+Fork Enhancements (2026)
+-------------------------
+
+1. AI Rewrite Mode — Voice-to-Improved-Text Pipeline
+   Record → Transcribe (whisper.cpp) → Rewrite (local LLM) → Inject polished text.
+   Second configurable hotkey triggers the rewrite flow. Supports configurable
+   prompt presets (Improve, Formalize, Simplify, Summarize, Fix Grammar) and
+   custom prompts. Temperature, max tokens, and active preset all user-configurable.
+
+2. Ollama Backend Integration
+   Switched from raw llama-cli subprocess to Ollama CLI (`ollama run <model>`).
+   Ollama handles GPU layer offloading, model management, and CUDA compatibility
+   natively — solving RTX 5080 (Blackwell, sm_120) incompatibility with llama.cpp
+   CUDA 12.4 builds (max sm_89). Prompt delivered via stdin pipe, response captured
+   from stdout. Supports any Ollama-installed model (gemma3, qwen2.5, llama3.2, etc).
+
+3. Microphone Warm-Up Fix
+   Fixed a cold-start bug where the first recording after app launch captured
+   0 bytes of audio (46-byte WAV = header only). Root cause: NAudio WaveInEvent
+   DataAvailable callback never fired on first device open. Fix: background
+   warm-up cycle in AudioRecorder constructor — briefly opens device, waits for
+   one callback (up to 500ms), closes. All subsequent recordings capture normally.
+
+4. All Models Unlocked
+   Removed Pro license gating. All whisper.cpp models (tiny, base, small, medium,
+   large-v3) available to all users regardless of license status.
+
+5. CUDA GPU Support
+   Enabled CUDA-accelerated whisper.cpp inference. GPU offloading via -ngl flag
+   with configurable layer count.
+
+6. Model Hot-Swap
+   Runtime model switching without app restart. Change whisper model in settings,
+   next transcription uses the new model immediately.
+
+7. License Removal
+   Removed commercial licensing infrastructure (activation checks, device limits,
+   Pro feature gating). App runs fully unlocked.
+
+
+Third-Party Dependencies
+------------------------
+
+whisper.cpp — MIT License — https://github.com/ggerganov/whisper.cpp
+  Speech-to-text inference engine. Bundled as whisper.exe subprocess.
+
+Ollama — MIT License — https://github.com/ollama/ollama
+  Local LLM runtime. Used via CLI for AI rewrite feature. User-installed.
+
+NAudio — MIT License — https://github.com/naudio/NAudio
+  .NET audio library for microphone capture (WaveInEvent).
+
+llama.cpp — MIT License — https://github.com/ggerganov/llama.cpp
+  LLM inference engine (used by Ollama internally).
