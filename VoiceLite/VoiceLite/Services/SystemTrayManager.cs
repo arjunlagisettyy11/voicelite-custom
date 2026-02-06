@@ -28,7 +28,7 @@ namespace VoiceLite.Services
             trayIcon = new TaskbarIcon
             {
                 Icon = customIcon ?? System.Drawing.SystemIcons.Application,
-                ToolTipText = "VoiceLite - Hold Alt to dictate"
+                ToolTipText = "VoiceLite - Lagisetty Build - Hold Alt to dictate"
             };
 
             trayIcon.TrayMouseDoubleClick += (s, e) =>

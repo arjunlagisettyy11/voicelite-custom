@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:VoiceLite.Controls"
         mc:Ignorable="d"
-        Title="VoiceLite Settings" Height="650" Width="850"
+        Title="VoiceLite Settings - Lagisetty Build" Height="650" Width="850"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         MinHeight="500" MinWidth="700"
@@ -20,7 +20,7 @@
         <!-- Header -->
         <Border Grid.Row="0" Background="#FAFAFA" Padding="20,15">
             <Grid>
-                <TextBlock Text="VoiceLite Settings" FontSize="20" FontWeight="SemiBold" Foreground="#333333" HorizontalAlignment="Left"/>
+                <TextBlock Text="VoiceLite - Lagisetty Build" FontSize="20" FontWeight="SemiBold" Foreground="#333333" HorizontalAlignment="Left"/>
                 <TextBlock Name="VersionText" Text="" FontSize="12" Foreground="#95A5A6" HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
         </Border>
@@ -387,9 +387,7 @@
                                                    TextWrapping="Wrap"
                                                    Foreground="#1E3A8A"
                                                    FontSize="12">
-                                            <Run Text="Free tier includes the Tiny model (80-85% accuracy)."/>
-                                            <LineBreak/>
-                                            <Run Text="Upgrade to Pro to unlock all 5 AI models (90-98% accuracy) and in-app model downloads."/>
+                                            <Run Text="Lagisetty Build - All models unlocked. GPU acceleration enabled."/>
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>

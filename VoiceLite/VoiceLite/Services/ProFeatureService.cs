@@ -96,12 +96,7 @@ namespace VoiceLite.Services
         /// <returns>True if user can use this model</returns>
         public bool CanUseModel(string modelFileName)
         {
-            if (IsProUser)
-                return true; // Pro users can use any model
-
-            // Free tier: Base only
-            var lowerFileName = modelFileName?.ToLower();
-            return lowerFileName == "ggml-base.bin";
+            return true; // All models available (MIT license, personal build)
         }
 
         /// <summary>
@@ -134,12 +129,7 @@ namespace VoiceLite.Services
         /// </summary>
         public bool IsModelAvailable(string modelName)
         {
-            if (IsProUser)
-                return true; // Pro users can use all models
-
-            // Free users can only use base model
-            var lowerName = modelName?.ToLower();
-            return lowerName?.Contains("base") == true;
+            return true; // All models available (MIT license, personal build)
         }
 
         /// <summary>
@@ -147,21 +137,14 @@ namespace VoiceLite.Services
         /// </summary>
         public string[] GetAvailableModels()
         {
-            if (IsProUser)
+            return new[]
             {
-                return new[]
-                {
-                    "ggml-tiny.bin",
-                    "ggml-base.bin",
-                    "ggml-small.bin",
-                    "ggml-medium.bin",
-                    "ggml-large-v3.bin"
-                };
-            }
-            else
-            {
-                return new[] { "ggml-base.bin" };
-            }
+                "ggml-tiny.bin",
+                "ggml-base.bin",
+                "ggml-small.bin",
+                "ggml-medium.bin",
+                "ggml-large-v3.bin"
+            };
         }
 
         /// <summary>

@@ -69,9 +69,8 @@ namespace VoiceLite.Services
             // SECURITY FIX (MODEL-GATE-001): Pass ProFeatureService to enable license validation
             this.modelResolver = modelResolver ?? new ModelResolverService(baseDir, proFeatureService);
 
-            // Cache paths at initialization
+            // Cache whisper.exe path (doesn't change), but NOT model path (user can switch models at runtime)
             cachedWhisperExePath = this.modelResolver.ResolveWhisperExePath();
-            cachedModelPath = this.modelResolver.ResolveModelPath(settings.WhisperModel);
 
             // Create dummy audio file and start warmup process
             _ = Task.Run(async () =>

@@ -76,44 +76,8 @@ namespace VoiceLite.Services
         /// </summary>
         public bool ValidateWhisperExecutable(string whisperExePath)
         {
-            // Skip validation if bypass flag set (testing only)
-            if (_skipIntegrityValidation)
-            {
-                return true;
-            }
-
-            try
-            {
-                using var sha256 = System.Security.Cryptography.SHA256.Create();
-                using var stream = File.OpenRead(whisperExePath);
-                var hash = sha256.ComputeHash(stream);
-                var hashString = BitConverter.ToString(hash).Replace("-", "");
-
-                // HIGH-4 FIX: Fail CLOSED on hash mismatch (security-critical)
-                if (!hashString.Equals(EXPECTED_WHISPER_HASH, StringComparison.OrdinalIgnoreCase))
-                {
-                    var hashMismatchEx = new SecurityException("Whisper executable integrity verification failed. Please reinstall VoiceLite.");
-                    ErrorLogger.LogError("Whisper.exe integrity check FAILED - refusing to execute", hashMismatchEx);
-                    throw hashMismatchEx;
-                }
-
-                // Only log success on first check
-                if (!_integrityWarningLogged)
-                {
-                    ErrorLogger.LogMessage("Whisper.exe integrity check passed");
-                }
-                return true;
-            }
-            catch (SecurityException)
-            {
-                throw; // Re-throw security exceptions (hash mismatch)
-            }
-            catch (Exception ex)
-            {
-                // HIGH-4 FIX: Fail CLOSED on validation error (security-critical)
-                ErrorLogger.LogError("Failed to validate whisper.exe integrity", ex);
-                throw new SecurityException("Whisper executable integrity check failed. Please reinstall VoiceLite.", ex);
-            }
+            // Hash check disabled - Lagisetty custom build with CUDA whisper.exe
+            return true;
         }
 
         /// <summary>
@@ -125,19 +89,7 @@ namespace VoiceLite.Services
         {
             var modelFile = NormalizeModelName(modelName);
 
-            // SECURITY FIX (MODEL-GATE-001): Validate Pro license before resolving Pro models
-            // This prevents freemium bypass where users manually download Pro models
-            if (_proFeatureService != null && !_proFeatureService.CanUseModel(modelFile))
-            {
-                throw new UnauthorizedAccessException(
-                    $"Model '{GetModelDisplayName(modelFile)}' requires Pro license.\n\n" +
-                    _proFeatureService.GetUpgradeMessage("Advanced AI Models") + "\n\n" +
-                    "Free tier includes Swift model (ggml-base.bin) which provides excellent accuracy for most users.\n" +
-                    "Upgrade to Pro to unlock:\n" +
-                    "- Pro model (90-93% accuracy)\n" +
-                    "- Elite model (95-97% accuracy)\n" +
-                    "- Ultra model (97-99% Dragon-level quality)");
-            }
+            // Model gate removed - all models available (MIT license, personal build)
 
             // Check bundled models in Program Files (read-only)
             var modelPath = Path.Combine(_baseDir, "whisper", modelFile);

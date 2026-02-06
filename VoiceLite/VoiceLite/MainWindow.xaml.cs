@@ -1901,12 +1901,10 @@ namespace VoiceLite
 
         private void ValidateWhisperModel()
         {
+            // Lagisetty Build: All license checks removed, all models available
+            // Just verify the selected model file exists
             try
             {
-                // CRITICAL FIX: Validate Pro license + model permissions to prevent settings.json editing bypass
-                var proService = new ProFeatureService(settings);
-
-                // Use PersistentWhisperService's logic: support both short names and full filenames
                 var modelFile = settings.WhisperModel switch
                 {
                     "tiny" => "ggml-tiny.bin",
@@ -1917,90 +1915,16 @@ namespace VoiceLite
                     _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-base.bin"
                 };
 
-                // CRITICAL FIX: If user manually edited settings.json to set Pro model without license, revert to Base
-                if (!proService.CanUseModel(modelFile))
-                {
-                    ErrorLogger.LogWarning($"SECURITY: Free user had Pro model '{modelFile}' in settings.json - reverting to Base (possible manual edit)");
-                    settings.WhisperModel = "ggml-base.bin";
-                    modelFile = "ggml-base.bin";
-                    _ = SaveSettingsInternalAsync(); // Save corrected settings
-
-                    MessageBox.Show(
-                        "VoiceLite Free includes the Base model as default.\n\n" +
-                        "The selected AI model has been reset to Base.\n\n" +
-                        "To use Base, Small, Medium, or Large models, upgrade to VoiceLite Pro for $20.\n\n" +
-                        "Visit Settings → License to upgrade.",
-                        "Free Tier Model Limit",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
-
-                // Also validate IsProLicense flag consistency
-                if (settings.IsProLicense && string.IsNullOrWhiteSpace(settings.LicenseKey))
-                {
-                    ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no license key - possible manual edit, resetting to free");
-                    settings.IsProLicense = false;
-                    settings.LicenseKey = string.Empty;
-                    _ = SaveSettingsInternalAsync();
-                }
-                // HIGH-3 FIX: Verify settings.json license key matches DPAPI-encrypted storage
-                // Prevents bypass where attacker edits settings.json with fake license key
-                else if (settings.IsProLicense && !string.IsNullOrWhiteSpace(settings.LicenseKey))
-                {
-                    if (!LicenseService.VerifyLicenseKeyMatchesStorage(settings.LicenseKey))
-                    {
-                        ErrorLogger.LogWarning("SECURITY: License key in settings.json doesn't match DPAPI storage - possible tampering, resetting to free");
-                        settings.IsProLicense = false;
-                        settings.LicenseKey = string.Empty;
-                        _ = SaveSettingsInternalAsync();
-                    }
-                }
-
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
-                // Also check LocalAppData for downloaded models
                 var localDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "VoiceLite",
-                    "whisper",
-                    modelFile
-                );
+                    "VoiceLite", "whisper", modelFile);
 
                 if (!File.Exists(modelPath) && !File.Exists(localDataPath))
                 {
-                    // Check if base model exists as fallback
-                    var baseModelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-                    var baseLocalPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "VoiceLite", "whisper", "ggml-base.bin");
-
-                    if (File.Exists(baseModelPath) || File.Exists(baseLocalPath))
-                    {
-                        // CRITICAL FIX: Fallback to base model so app is usable
-                        ErrorLogger.LogWarning($"Model '{modelFile}' missing - falling back to ggml-base.bin");
-                        settings.WhisperModel = "ggml-base.bin";
-                        _ = SaveSettingsInternalAsync();
-
-                        MessageBox.Show(
-                            $"Model file '{modelFile}' is missing.\n\n" +
-                            "VoiceLite has switched to the bundled Swift (Base) model.\n\n" +
-                            "To download other models, go to Settings → AI Models.",
-                            "Model File Missing - Using Swift",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    }
-                    else
-                    {
-                        // No models available at all - show error
-                        MessageBox.Show(
-                            $"Model file '{modelFile}' is missing.\n\n" +
-                            "Please reinstall VoiceLite or download the model from Settings → AI Models.\n\n" +
-                            $"Expected locations:\n" +
-                            $"- Bundled: {modelPath}\n" +
-                            $"- Downloaded: {localDataPath}",
-                            "Model File Missing",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                    }
+                    ErrorLogger.LogWarning($"Model '{modelFile}' missing - falling back to ggml-base.bin");
+                    settings.WhisperModel = "ggml-base.bin";
+                    _ = SaveSettingsInternalAsync();
                 }
             }
             catch (Exception ex)
