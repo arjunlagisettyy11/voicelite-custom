@@ -429,6 +429,8 @@ namespace VoiceLite
 
             // AI Rewrite settings
             settings.EnableRewrite = EnableRewriteCheckBox.IsChecked ?? false;
+            if (OllamaModelTextBox != null && !string.IsNullOrWhiteSpace(OllamaModelTextBox.Text))
+                settings.OllamaModel = OllamaModelTextBox.Text.Trim();
             settings.RewriteTemperature = RewriteTemperatureSlider.Value;
             settings.RewriteMaxTokens = (int)RewriteMaxTokensSlider.Value;
 
@@ -749,11 +751,9 @@ namespace VoiceLite
                 if (RewriteHotkeyTextBox != null)
                     RewriteHotkeyTextBox.Text = HotkeyDisplayHelper.Format(settings.RewriteHotkey, settings.RewriteHotkeyModifiers);
 
-                // Model paths
-                if (LlamaModelPathTextBox != null)
-                    LlamaModelPathTextBox.Text = settings.LlamaModelPath;
-                if (LlamaExePathTextBox != null)
-                    LlamaExePathTextBox.Text = settings.LlamaExecutablePath;
+                // Ollama model
+                if (OllamaModelTextBox != null)
+                    OllamaModelTextBox.Text = settings.OllamaModel;
 
                 // Temperature and Max Tokens
                 if (RewriteTemperatureSlider != null)
@@ -868,35 +868,7 @@ namespace VoiceLite
             settings.RewriteHotkeyModifiers = capturedRewriteModifiers;
         }
 
-        private void BrowseLlamaModelButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Filter = "GGUF Model Files (*.gguf)|*.gguf|All Files (*.*)|*.*",
-                Title = "Select LLM Model File"
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                settings.LlamaModelPath = dialog.FileName;
-                LlamaModelPathTextBox.Text = dialog.FileName;
-            }
-        }
-
-        private void BrowseLlamaExeButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Filter = "Executables (*.exe)|*.exe|All Files (*.*)|*.*",
-                Title = "Select llama-cli Executable"
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                settings.LlamaExecutablePath = dialog.FileName;
-                LlamaExePathTextBox.Text = dialog.FileName;
-            }
-        }
+        // Ollama model is saved via the standard SaveSettings flow — no browse needed
 
         private void RewritePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

@@ -238,10 +238,14 @@ namespace VoiceLite.Models
         // CRITICAL: Always capped at 4 threads to prevent CPU thrashing (see v1.1.2 performance fix)
         public int Threads { get; set; } = 4; // Fixed optimal thread count
 
-        // AI Rewrite Settings (llama.cpp subprocess for text rewriting)
-        public bool EnableRewrite { get; set; } = false;
+        // AI Rewrite Settings
+        public bool EnableRewrite { get; set; } = true;
         public Key RewriteHotkey { get; set; } = Key.X;
         public ModifierKeys RewriteHotkeyModifiers { get; set; } = ModifierKeys.Shift;
+        // Ollama settings (primary backend - uses GPU automatically)
+        public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
+        public string OllamaModel { get; set; } = "gemma3:4b";
+        // Legacy llama-cli settings (fallback if Ollama unavailable)
         public string LlamaModelPath { get; set; } = "";
         public string LlamaExecutablePath { get; set; } = "";
         private int _rewriteMaxTokens = 1024;
@@ -257,6 +261,12 @@ namespace VoiceLite.Models
             set => _rewriteTemperature = Math.Clamp(value, 0.0, 1.5);
         }
         public string ActiveRewritePreset { get; set; } = "Improve";
+        private int _rewriteGpuLayers = 0;
+        public int RewriteGpuLayers
+        {
+            get => _rewriteGpuLayers;
+            set => _rewriteGpuLayers = Math.Clamp(value, 0, 999);
+        }
         public List<RewritePromptTemplate> RewritePrompts { get; set; } = GetDefaultRewritePrompts();
 
         public static List<RewritePromptTemplate> GetDefaultRewritePrompts()

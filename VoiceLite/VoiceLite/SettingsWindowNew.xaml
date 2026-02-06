@@ -422,47 +422,13 @@
                                 </StackPanel>
                             </GroupBox>
 
-                            <!-- LLM Model Configuration -->
-                            <GroupBox Header="LLM Model" Margin="0,0,0,15">
+                            <!-- Ollama Model Configuration -->
+                            <GroupBox Header="Ollama Model" Margin="0,0,0,15">
                                 <StackPanel Margin="10">
-                                    <TextBlock Text="Model File (.gguf):" Margin="0,0,0,5"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Name="LlamaModelPathTextBox"
-                                                 Grid.Column="0"
-                                                 Padding="5"
-                                                 IsReadOnly="True"
-                                                 Background="#F0F0F0"/>
-                                        <Button Name="BrowseLlamaModelButton"
-                                                Grid.Column="1"
-                                                Content="Browse..."
-                                                Width="80"
-                                                Margin="5,0,0,0"
-                                                Click="BrowseLlamaModelButton_Click"/>
-                                    </Grid>
-
-                                    <TextBlock Text="llama-cli Executable (optional - auto-detected):" Margin="0,10,0,5"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Name="LlamaExePathTextBox"
-                                                 Grid.Column="0"
-                                                 Padding="5"
-                                                 IsReadOnly="True"
-                                                 Background="#F0F0F0"/>
-                                        <Button Name="BrowseLlamaExeButton"
-                                                Grid.Column="1"
-                                                Content="Browse..."
-                                                Width="80"
-                                                Margin="5,0,0,0"
-                                                Click="BrowseLlamaExeButton_Click"/>
-                                    </Grid>
-                                    <TextBlock Text="Recommended models: Qwen2.5-3B-Instruct, Phi-3.5-mini-instruct, Gemma-2-2B-it (Q4_K_M quantization)"
+                                    <TextBlock Text="Model name (from 'ollama list'):" Margin="0,0,0,5"/>
+                                    <TextBox Name="OllamaModelTextBox"
+                                             Padding="5"/>
+                                    <TextBlock Text="Installed models: gemma3:4b, llama3.2:3b, gemma3:12b, qwen2.5:7b"
                                                FontSize="10"
                                                Foreground="Gray"
                                                TextWrapping="Wrap"

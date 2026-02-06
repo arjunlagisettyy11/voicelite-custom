@@ -67,6 +67,42 @@ namespace VoiceLite.Services
             cleanupTimer.Elapsed += (s, e) => CleanupStaleAudioFiles();
             cleanupTimer.AutoReset = true;
             cleanupTimer.Start();
+
+            // Warm up the audio device on a background thread
+            // Some Windows audio devices don't deliver data on the very first recording
+            // after the process starts. A brief dummy open/record/close cycle fixes this.
+            _ = Task.Run(() => WarmUpMicrophone());
+        }
+
+        private void WarmUpMicrophone()
+        {
+            try
+            {
+                int deviceToUse = selectedDeviceIndex >= 0 ? selectedDeviceIndex : 0;
+                if (WaveInEvent.DeviceCount == 0) return;
+
+                using var warmup = new WaveInEvent
+                {
+                    WaveFormat = new WaveFormat(16000, 16, 1),
+                    BufferMilliseconds = 50,
+                    NumberOfBuffers = 2,
+                    DeviceNumber = deviceToUse
+                };
+
+                var dataReceived = new ManualResetEventSlim(false);
+                warmup.DataAvailable += (s, e) => dataReceived.Set();
+                warmup.StartRecording();
+
+                // Wait up to 500ms for at least one audio callback
+                dataReceived.Wait(500);
+
+                warmup.StopRecording();
+                ErrorLogger.LogMessage("AudioRecorder: Microphone warm-up complete");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"AudioRecorder: Microphone warm-up failed (non-fatal): {ex.Message}");
+            }
         }
 
         private void CleanupStaleAudioFiles()
