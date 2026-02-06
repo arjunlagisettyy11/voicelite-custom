@@ -28,6 +28,8 @@ namespace VoiceLite
         private AudioRecorder? audioRecorder;
         private PersistentWhisperService? whisperService;
         private HotkeyManager? hotkeyManager;
+        private HotkeyManager? rewriteHotkeyManager;
+        private LlamaRewriteService? llamaRewriteService;
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private TranscriptionHistoryService? historyService;
@@ -50,6 +52,7 @@ namespace VoiceLite
         private bool isRecording = false;
         private bool isTranscribing = false;
         private bool isHotkeyMode = false;
+        private bool isRewriteMode = false; // Flag: current recording should be rewritten after transcription
         private readonly object recordingLock = new object();
 
         // UI BUG FIX: Initialization flag to suppress polling mode warnings during startup
@@ -521,6 +524,16 @@ namespace VoiceLite
                     hotkeyManager.PollingModeActivated += OnPollingModeActivated;
                 }
 
+                // Initialize AI Rewrite service and hotkey
+                if (settings.EnableRewrite)
+                {
+                    llamaRewriteService = new LlamaRewriteService(settings);
+
+                    rewriteHotkeyManager = new HotkeyManager(hotkeyId: 9001);
+                    rewriteHotkeyManager.HotkeyPressed += OnRewriteHotkeyPressed;
+                    rewriteHotkeyManager.HotkeyReleased += OnRewriteHotkeyReleased;
+                }
+
                 systemTrayManager = new SystemTrayManager();
                 await Dispatcher.InvokeAsync(() => systemTrayManager.Initialize(this));
 
@@ -564,6 +577,20 @@ namespace VoiceLite
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     // App continues - user can still use manual buttons
+                }
+
+                // Step 2b: Register rewrite hotkey if enabled
+                if (settings.EnableRewrite && rewriteHotkeyManager != null)
+                {
+                    try
+                    {
+                        rewriteHotkeyManager.RegisterHotkey(helper.Handle, settings.RewriteHotkey, settings.RewriteHotkeyModifiers);
+                        ErrorLogger.LogMessage($"Rewrite hotkey registered: {HotkeyDisplayHelper.Format(settings.RewriteHotkey, settings.RewriteHotkeyModifiers)}");
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        ErrorLogger.LogError("Rewrite hotkey registration failed", ex);
+                    }
                 }
 
                 // Step 3: Update UI (now safe - all services initialized)
@@ -1104,6 +1131,34 @@ namespace VoiceLite
             }
         }
 
+        private void OnRewriteHotkeyPressed(object? sender, EventArgs e)
+        {
+            try
+            {
+                ErrorLogger.LogMessage("OnRewriteHotkeyPressed: Setting rewrite mode flag");
+                isRewriteMode = true;
+                OnHotkeyPressed(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnRewriteHotkeyPressed exception", ex);
+                isRewriteMode = false;
+            }
+        }
+
+        private void OnRewriteHotkeyReleased(object? sender, EventArgs e)
+        {
+            try
+            {
+                OnHotkeyReleased(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnRewriteHotkeyReleased exception", ex);
+                isRewriteMode = false;
+            }
+        }
+
         /// <summary>
         /// BUG-006 FIX: Handle polling mode activation notification
         /// Shows a brief status message when polling mode is active for standalone modifier keys
@@ -1543,6 +1598,33 @@ namespace VoiceLite
                 var transcription = await transcriber.TranscribeAsync(audioFilePath);
                 ErrorLogger.LogWarning($"OnAudioFileReady: TranscribeAsync returned: '{transcription}'");
 
+                // AI Rewrite: If rewrite mode is active, pass transcription through LLM
+                if (isRewriteMode && llamaRewriteService != null && !string.IsNullOrWhiteSpace(transcription))
+                {
+                    isRewriteMode = false;
+                    await Dispatcher.InvokeAsync(() => UpdateStatus("Rewriting...", Brushes.Blue));
+                    try
+                    {
+                        var activePreset = settings.RewritePrompts
+                            ?.Find(p => p.Name == settings.ActiveRewritePreset);
+                        if (activePreset != null)
+                        {
+                            var rewritten = await llamaRewriteService.RewriteAsync(transcription, activePreset.SystemPrompt);
+                            ErrorLogger.LogWarning($"OnAudioFileReady: LLM rewrite returned: '{rewritten.Substring(0, Math.Min(rewritten.Length, 200))}'");
+                            transcription = rewritten;
+                        }
+                    }
+                    catch (Exception rewriteEx)
+                    {
+                        ErrorLogger.LogError("AI Rewrite failed, using raw transcription", rewriteEx);
+                        await Dispatcher.InvokeAsync(() => UpdateStatus("Rewrite failed - using original", Brushes.Orange));
+                    }
+                }
+                else
+                {
+                    isRewriteMode = false;
+                }
+
                 await Dispatcher.InvokeAsync(() =>
                 {
                     StopStuckStateRecoveryTimer();
@@ -1833,6 +1915,37 @@ namespace VoiceLite
                     ErrorLogger.LogMessage("Hotkey unchanged - skipping re-registration");
                 }
 
+                // Recreate rewrite hotkey manager and LLM service based on settings
+                if (settings.EnableRewrite)
+                {
+                    if (llamaRewriteService == null)
+                        llamaRewriteService = new LlamaRewriteService(settings);
+
+                    // Always recreate rewrite hotkey manager to pick up any setting changes
+                    rewriteHotkeyManager?.Dispose();
+                    rewriteHotkeyManager = new HotkeyManager(hotkeyId: 9001);
+                    rewriteHotkeyManager.HotkeyPressed += OnRewriteHotkeyPressed;
+                    rewriteHotkeyManager.HotkeyReleased += OnRewriteHotkeyReleased;
+                    try
+                    {
+                        var rwHelper = new WindowInteropHelper(this);
+                        rewriteHotkeyManager.RegisterHotkey(rwHelper.Handle, settings.RewriteHotkey, settings.RewriteHotkeyModifiers);
+                        ErrorLogger.LogMessage($"Rewrite hotkey re-registered: {HotkeyDisplayHelper.Format(settings.RewriteHotkey, settings.RewriteHotkeyModifiers)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogWarning($"Failed to register rewrite hotkey: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // Rewrite disabled - clean up
+                    rewriteHotkeyManager?.Dispose();
+                    rewriteHotkeyManager = null;
+                    llamaRewriteService?.Dispose();
+                    llamaRewriteService = null;
+                }
+
                 // Always update UI regardless of service recreation success
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
@@ -2047,6 +2160,17 @@ namespace VoiceLite
                 // Now dispose services in reverse order of creation
                 systemTrayManager?.Dispose();
                 systemTrayManager = null;
+
+                // Dispose rewrite hotkey manager and service
+                if (rewriteHotkeyManager != null)
+                {
+                    rewriteHotkeyManager.HotkeyPressed -= OnRewriteHotkeyPressed;
+                    rewriteHotkeyManager.HotkeyReleased -= OnRewriteHotkeyReleased;
+                    rewriteHotkeyManager.Dispose();
+                    rewriteHotkeyManager = null;
+                }
+                llamaRewriteService?.Dispose();
+                llamaRewriteService = null;
 
                 hotkeyManager?.Dispose();
                 hotkeyManager = null;

@@ -32,6 +32,13 @@ namespace VoiceLite.Models
         Accuracy        // Best transcription quality (beam_size=5, minimal optimizations) - Slower but more accurate
     }
 
+    public class RewritePromptTemplate
+    {
+        public string Name { get; set; } = "";
+        public string SystemPrompt { get; set; } = "";
+        public bool IsBuiltIn { get; set; } = false;
+    }
+
     public class WhisperPresetConfig
     {
         public int BeamSize { get; set; }
@@ -231,6 +238,64 @@ namespace VoiceLite.Models
         // CRITICAL: Always capped at 4 threads to prevent CPU thrashing (see v1.1.2 performance fix)
         public int Threads { get; set; } = 4; // Fixed optimal thread count
 
+        // AI Rewrite Settings (llama.cpp subprocess for text rewriting)
+        public bool EnableRewrite { get; set; } = false;
+        public Key RewriteHotkey { get; set; } = Key.X;
+        public ModifierKeys RewriteHotkeyModifiers { get; set; } = ModifierKeys.Shift;
+        public string LlamaModelPath { get; set; } = "";
+        public string LlamaExecutablePath { get; set; } = "";
+        private int _rewriteMaxTokens = 1024;
+        public int RewriteMaxTokens
+        {
+            get => _rewriteMaxTokens;
+            set => _rewriteMaxTokens = Math.Clamp(value, 128, 4096);
+        }
+        private double _rewriteTemperature = 0.7;
+        public double RewriteTemperature
+        {
+            get => _rewriteTemperature;
+            set => _rewriteTemperature = Math.Clamp(value, 0.0, 1.5);
+        }
+        public string ActiveRewritePreset { get; set; } = "Improve";
+        public List<RewritePromptTemplate> RewritePrompts { get; set; } = GetDefaultRewritePrompts();
+
+        public static List<RewritePromptTemplate> GetDefaultRewritePrompts()
+        {
+            return new List<RewritePromptTemplate>
+            {
+                new RewritePromptTemplate
+                {
+                    Name = "Improve",
+                    SystemPrompt = "Rewrite the following text to be clearer and more professional while preserving the original meaning. Output only the rewritten text, nothing else.",
+                    IsBuiltIn = true
+                },
+                new RewritePromptTemplate
+                {
+                    Name = "Formalize",
+                    SystemPrompt = "Rewrite the following text in a formal, business-appropriate tone. Output only the rewritten text.",
+                    IsBuiltIn = true
+                },
+                new RewritePromptTemplate
+                {
+                    Name = "Simplify",
+                    SystemPrompt = "Simplify the following text using plain language. Output only the simplified text.",
+                    IsBuiltIn = true
+                },
+                new RewritePromptTemplate
+                {
+                    Name = "Summarize",
+                    SystemPrompt = "Summarize the following text into key points. Output only the summary.",
+                    IsBuiltIn = true
+                },
+                new RewritePromptTemplate
+                {
+                    Name = "Fix Grammar",
+                    SystemPrompt = "Fix any grammar, spelling, and punctuation errors in the following text. Output only the corrected text.",
+                    IsBuiltIn = true
+                }
+            };
+        }
+
         // Static methods for loading/saving settings
         public static Settings Load()
         {
@@ -291,6 +356,14 @@ namespace VoiceLite.Models
 
             // Force re-validation by triggering property setters
             settings.WhisperTimeoutMultiplier = settings.WhisperTimeoutMultiplier;
+            settings.RewriteMaxTokens = settings.RewriteMaxTokens;
+            settings.RewriteTemperature = settings.RewriteTemperature;
+
+            // Ensure rewrite prompts list is never null
+            if (settings.RewritePrompts == null || settings.RewritePrompts.Count == 0)
+            {
+                settings.RewritePrompts = Settings.GetDefaultRewritePrompts();
+            }
 
             return settings;
         }

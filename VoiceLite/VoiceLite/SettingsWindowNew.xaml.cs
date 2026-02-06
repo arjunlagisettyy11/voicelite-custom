@@ -20,6 +20,9 @@ namespace VoiceLite
         private bool isCapturingHotkey = false;
         private Key capturedKey = Key.None;
         private ModifierKeys capturedModifiers = ModifierKeys.None;
+        private bool isCapturingRewriteHotkey = false;
+        private Key capturedRewriteKey = Key.None;
+        private ModifierKeys capturedRewriteModifiers = ModifierKeys.None;
         private Action? testRecordingCallback;
         private Action? saveSettingsCallback; // CRITICAL FIX: Callback to persist settings to disk
         private string? originalModel;
@@ -91,6 +94,9 @@ namespace VoiceLite
                 // Initialize Model Download Control (applies Pro gating for both free and Pro users)
                 // CRITICAL FIX: Must initialize for ALL users to apply visibility gating
                 ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
+
+                // Load AI Rewrite settings
+                LoadRewriteSettings();
 
                 // Load Custom Shortcuts
                 LoadShortcuts();
@@ -420,6 +426,21 @@ namespace VoiceLite
             // Audio Enhancement - already saved via event handlers, no need to duplicate
 
             // Hotkey (already saved on change)
+
+            // AI Rewrite settings
+            settings.EnableRewrite = EnableRewriteCheckBox.IsChecked ?? false;
+            settings.RewriteTemperature = RewriteTemperatureSlider.Value;
+            settings.RewriteMaxTokens = (int)RewriteMaxTokensSlider.Value;
+
+            // Save current prompt text back to the active preset
+            if (RewritePresetComboBox.SelectedItem is string selectedPresetName)
+            {
+                var preset = settings.RewritePrompts?.Find(p => p.Name == selectedPresetName);
+                if (preset != null)
+                {
+                    preset.SystemPrompt = RewritePromptTextBox.Text;
+                }
+            }
         }
 
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
@@ -710,6 +731,196 @@ namespace VoiceLite
             {
                 EditShortcutButton_Click(sender, e);
             }
+        }
+
+        // ========== AI Rewrite Settings ==========
+
+        private void LoadRewriteSettings()
+        {
+            try
+            {
+                if (EnableRewriteCheckBox != null)
+                    EnableRewriteCheckBox.IsChecked = settings.EnableRewrite;
+
+                if (RewriteSettingsPanel != null)
+                    RewriteSettingsPanel.IsEnabled = settings.EnableRewrite;
+
+                // Rewrite Hotkey
+                if (RewriteHotkeyTextBox != null)
+                    RewriteHotkeyTextBox.Text = HotkeyDisplayHelper.Format(settings.RewriteHotkey, settings.RewriteHotkeyModifiers);
+
+                // Model paths
+                if (LlamaModelPathTextBox != null)
+                    LlamaModelPathTextBox.Text = settings.LlamaModelPath;
+                if (LlamaExePathTextBox != null)
+                    LlamaExePathTextBox.Text = settings.LlamaExecutablePath;
+
+                // Temperature and Max Tokens
+                if (RewriteTemperatureSlider != null)
+                {
+                    RewriteTemperatureSlider.Value = settings.RewriteTemperature;
+                    if (RewriteTemperatureText != null)
+                        RewriteTemperatureText.Text = settings.RewriteTemperature.ToString("F1");
+                }
+                if (RewriteMaxTokensSlider != null)
+                {
+                    RewriteMaxTokensSlider.Value = settings.RewriteMaxTokens;
+                    if (RewriteMaxTokensText != null)
+                        RewriteMaxTokensText.Text = settings.RewriteMaxTokens.ToString();
+                }
+
+                // Prompt presets
+                LoadRewritePresets();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("LoadRewriteSettings failed", ex);
+            }
+        }
+
+        private void LoadRewritePresets()
+        {
+            if (RewritePresetComboBox == null) return;
+
+            RewritePresetComboBox.Items.Clear();
+            if (settings.RewritePrompts != null)
+            {
+                foreach (var prompt in settings.RewritePrompts)
+                {
+                    RewritePresetComboBox.Items.Add(prompt.Name);
+                }
+            }
+
+            // Select active preset
+            var activeIndex = RewritePresetComboBox.Items.IndexOf(settings.ActiveRewritePreset);
+            if (activeIndex >= 0)
+                RewritePresetComboBox.SelectedIndex = activeIndex;
+            else if (RewritePresetComboBox.Items.Count > 0)
+                RewritePresetComboBox.SelectedIndex = 0;
+        }
+
+        private void EnableRewriteCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (RewriteSettingsPanel != null)
+                RewriteSettingsPanel.IsEnabled = EnableRewriteCheckBox.IsChecked ?? false;
+        }
+
+        private void RewriteHotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (!isCapturingRewriteHotkey) return;
+
+            e.Handled = true;
+
+            if (e.Key == Key.Escape)
+            {
+                RewriteHotkeyTextBox.Text = HotkeyDisplayHelper.Format(settings.RewriteHotkey, settings.RewriteHotkeyModifiers);
+                RewriteHotkeyTextBox.Background = System.Windows.Media.Brushes.LightGray;
+                isCapturingRewriteHotkey = false;
+                RewriteHotkeyInstructionText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var key = (e.Key == Key.System) ? e.SystemKey : e.Key;
+
+            if (key == Key.LeftShift || key == Key.RightShift ||
+                key == Key.LeftCtrl || key == Key.RightCtrl ||
+                key == Key.LeftAlt || key == Key.RightAlt ||
+                key == Key.LWin || key == Key.RWin ||
+                key == Key.CapsLock)
+            {
+                capturedRewriteKey = key;
+                capturedRewriteModifiers = ModifierKeys.None;
+                RewriteHotkeyTextBox.Text = HotkeyDisplayHelper.Format(capturedRewriteKey, capturedRewriteModifiers);
+                return;
+            }
+
+            capturedRewriteKey = key;
+            capturedRewriteModifiers = Keyboard.Modifiers;
+            RewriteHotkeyTextBox.Text = HotkeyDisplayHelper.Format(capturedRewriteKey, capturedRewriteModifiers);
+        }
+
+        private void RewriteHotkeyTextBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            isCapturingRewriteHotkey = true;
+            RewriteHotkeyTextBox.Background = System.Windows.Media.Brushes.LightYellow;
+            RewriteHotkeyInstructionText.Visibility = Visibility.Visible;
+        }
+
+        private void RewriteHotkeyTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            isCapturingRewriteHotkey = false;
+            RewriteHotkeyTextBox.Background = System.Windows.Media.Brushes.LightGray;
+            RewriteHotkeyInstructionText.Visibility = Visibility.Collapsed;
+
+            if (capturedRewriteKey != Key.None)
+            {
+                settings.RewriteHotkey = capturedRewriteKey;
+                settings.RewriteHotkeyModifiers = capturedRewriteModifiers;
+            }
+        }
+
+        private void ClearRewriteHotkeyButton_Click(object sender, RoutedEventArgs e)
+        {
+            capturedRewriteKey = Key.X;
+            capturedRewriteModifiers = ModifierKeys.Shift;
+            RewriteHotkeyTextBox.Text = HotkeyDisplayHelper.Format(capturedRewriteKey, capturedRewriteModifiers);
+            settings.RewriteHotkey = capturedRewriteKey;
+            settings.RewriteHotkeyModifiers = capturedRewriteModifiers;
+        }
+
+        private void BrowseLlamaModelButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "GGUF Model Files (*.gguf)|*.gguf|All Files (*.*)|*.*",
+                Title = "Select LLM Model File"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                settings.LlamaModelPath = dialog.FileName;
+                LlamaModelPathTextBox.Text = dialog.FileName;
+            }
+        }
+
+        private void BrowseLlamaExeButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Executables (*.exe)|*.exe|All Files (*.*)|*.*",
+                Title = "Select llama-cli Executable"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                settings.LlamaExecutablePath = dialog.FileName;
+                LlamaExePathTextBox.Text = dialog.FileName;
+            }
+        }
+
+        private void RewritePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (RewritePresetComboBox?.SelectedItem is string selectedName)
+            {
+                settings.ActiveRewritePreset = selectedName;
+                var preset = settings.RewritePrompts?.Find(p => p.Name == selectedName);
+                if (preset != null && RewritePromptTextBox != null)
+                {
+                    RewritePromptTextBox.Text = preset.SystemPrompt;
+                }
+            }
+        }
+
+        private void RewriteTemperatureSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (RewriteTemperatureText != null)
+                RewriteTemperatureText.Text = e.NewValue.ToString("F1");
+        }
+
+        private void RewriteMaxTokensSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (RewriteMaxTokensText != null)
+                RewriteMaxTokensText.Text = ((int)e.NewValue).ToString();
         }
 
         // HIGH-9 & HIGH-14 FIX: Cleanup event handlers and dispose resources on window close

@@ -20,7 +20,7 @@ namespace VoiceLite.Services
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
 
-        private const int HOTKEY_ID = 9000;
+        private readonly int _hotkeyId;
         private const uint MOD_NONE = 0x0000;
         private const uint MOD_ALT = 0x0001;
         private const uint MOD_CONTROL = 0x0002;
@@ -43,8 +43,9 @@ namespace VoiceLite.Services
         private readonly object stateLock = new();
         private readonly Dispatcher dispatcher;
 
-        public HotkeyManager()
+        public HotkeyManager(int hotkeyId = 9000)
         {
+            _hotkeyId = hotkeyId;
             dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
         }
 
@@ -114,7 +115,7 @@ namespace VoiceLite.Services
 
                 source.AddHook(HwndHook);
 
-                if (!RegisterHotKey(windowHandle, HOTKEY_ID, win32Modifiers, currentVirtualKey))
+                if (!RegisterHotKey(windowHandle, _hotkeyId, win32Modifiers, currentVirtualKey))
                 {
                     source.RemoveHook(HwndHook);
                     source = null;
@@ -384,7 +385,7 @@ namespace VoiceLite.Services
                 // Unregister standard hotkey if it was registered
                 if (windowHandle != IntPtr.Zero && !IsModifierKey(currentKey))
                 {
-                    UnregisterHotKey(windowHandle, HOTKEY_ID);
+                    UnregisterHotKey(windowHandle, _hotkeyId);
                     if (source != null)
                     {
                         source.RemoveHook(HwndHook);
@@ -432,7 +433,7 @@ namespace VoiceLite.Services
         {
             const int WM_HOTKEY = 0x0312;
 
-            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            if (msg == WM_HOTKEY && wParam.ToInt32() == _hotkeyId)
             {
                 bool shouldStartMonitoring = false;
 
@@ -451,7 +452,7 @@ namespace VoiceLite.Services
                     {
                         Key = currentKey,
                         Modifiers = currentModifiers,
-                        HotkeyId = HOTKEY_ID
+                        HotkeyId = _hotkeyId
                     });
 
                     // Start monitoring for key release (for push-to-talk mode)
@@ -592,7 +593,7 @@ namespace VoiceLite.Services
 
             if (isRegistered && windowHandle != IntPtr.Zero)
             {
-                UnregisterHotKey(windowHandle, HOTKEY_ID);
+                UnregisterHotKey(windowHandle, _hotkeyId);
                 if (source != null)
                 {
                     source.RemoveHook(HwndHook);

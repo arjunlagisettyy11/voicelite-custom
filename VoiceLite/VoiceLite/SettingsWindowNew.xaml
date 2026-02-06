@@ -358,6 +358,206 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- AI Rewrite Tab -->
+            <TabItem Header="AI Rewrite" Name="AIRewriteTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <TextBlock Text="AI Rewrite Mode"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,20"
+                                   FontSize="12">
+                            <Run Text="Record speech, transcribe it, then rewrite it with a local LLM (llama.cpp). Uses a separate hotkey from normal transcription."/>
+                        </TextBlock>
+
+                        <!-- Enable Rewrite -->
+                        <GroupBox Header="Enable AI Rewrite" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <CheckBox Name="EnableRewriteCheckBox"
+                                          Content="Enable AI Rewrite mode"
+                                          IsChecked="False"
+                                          Checked="EnableRewriteCheckBox_Changed"
+                                          Unchecked="EnableRewriteCheckBox_Changed"
+                                          ToolTip="When enabled, a second hotkey records and rewrites text using a local LLM"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Rewrite Settings Panel (disabled when rewrite is off) -->
+                        <StackPanel Name="RewriteSettingsPanel" IsEnabled="False">
+
+                            <!-- Rewrite Hotkey -->
+                            <GroupBox Header="Rewrite Hotkey" Margin="0,0,0,15">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="Rewrite Hotkey:" Margin="0,0,0,5"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Name="RewriteHotkeyTextBox"
+                                                 Grid.Column="0"
+                                                 IsReadOnly="True"
+                                                 Text="Shift+X"
+                                                 Padding="5"
+                                                 Background="#F0F0F0"
+                                                 PreviewKeyDown="RewriteHotkeyTextBox_PreviewKeyDown"
+                                                 GotFocus="RewriteHotkeyTextBox_GotFocus"
+                                                 LostFocus="RewriteHotkeyTextBox_LostFocus"/>
+                                        <Button Name="ClearRewriteHotkeyButton"
+                                                Grid.Column="1"
+                                                Content="Clear"
+                                                Width="60"
+                                                Margin="5,0,0,0"
+                                                Click="ClearRewriteHotkeyButton_Click"/>
+                                    </Grid>
+                                    <TextBlock Name="RewriteHotkeyInstructionText"
+                                               Text="Click the box and press your desired key combination"
+                                               FontSize="11"
+                                               Foreground="Gray"
+                                               Margin="0,5,0,0"
+                                               Visibility="Collapsed"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- LLM Model Configuration -->
+                            <GroupBox Header="LLM Model" Margin="0,0,0,15">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="Model File (.gguf):" Margin="0,0,0,5"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Name="LlamaModelPathTextBox"
+                                                 Grid.Column="0"
+                                                 Padding="5"
+                                                 IsReadOnly="True"
+                                                 Background="#F0F0F0"/>
+                                        <Button Name="BrowseLlamaModelButton"
+                                                Grid.Column="1"
+                                                Content="Browse..."
+                                                Width="80"
+                                                Margin="5,0,0,0"
+                                                Click="BrowseLlamaModelButton_Click"/>
+                                    </Grid>
+
+                                    <TextBlock Text="llama-cli Executable (optional - auto-detected):" Margin="0,10,0,5"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Name="LlamaExePathTextBox"
+                                                 Grid.Column="0"
+                                                 Padding="5"
+                                                 IsReadOnly="True"
+                                                 Background="#F0F0F0"/>
+                                        <Button Name="BrowseLlamaExeButton"
+                                                Grid.Column="1"
+                                                Content="Browse..."
+                                                Width="80"
+                                                Margin="5,0,0,0"
+                                                Click="BrowseLlamaExeButton_Click"/>
+                                    </Grid>
+                                    <TextBlock Text="Recommended models: Qwen2.5-3B-Instruct, Phi-3.5-mini-instruct, Gemma-2-2B-it (Q4_K_M quantization)"
+                                               FontSize="10"
+                                               Foreground="Gray"
+                                               TextWrapping="Wrap"
+                                               Margin="0,8,0,0"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- Prompt Template -->
+                            <GroupBox Header="Prompt Template" Margin="0,0,0,15">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="Active Preset:" Margin="0,0,0,5"/>
+                                    <ComboBox Name="RewritePresetComboBox"
+                                              Margin="0,0,0,10"
+                                              MaxWidth="300"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="RewritePresetComboBox_SelectionChanged"/>
+                                    <TextBlock Text="System Prompt:" Margin="0,0,0,5"/>
+                                    <TextBox Name="RewritePromptTextBox"
+                                             Height="80"
+                                             TextWrapping="Wrap"
+                                             AcceptsReturn="True"
+                                             VerticalScrollBarVisibility="Auto"
+                                             Padding="5"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- Generation Parameters -->
+                            <GroupBox Header="Generation Parameters" Margin="0,0,0,15">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="Temperature:" Margin="0,0,0,5" FontSize="11"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Slider Name="RewriteTemperatureSlider"
+                                                Grid.Column="0"
+                                                Minimum="0.0"
+                                                Maximum="1.5"
+                                                Value="0.7"
+                                                TickFrequency="0.1"
+                                                IsSnapToTickEnabled="True"
+                                                TickPlacement="BottomRight"
+                                                Margin="0,0,10,0"
+                                                ValueChanged="RewriteTemperatureSlider_ValueChanged"/>
+                                        <TextBlock Name="RewriteTemperatureText"
+                                                   Grid.Column="1"
+                                                   Text="0.7"
+                                                   FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   MinWidth="35"
+                                                   TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Lower = More deterministic, Higher = More creative"
+                                               FontSize="10"
+                                               Foreground="Gray"
+                                               Margin="0,3,0,10"
+                                               TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Max Tokens:" Margin="0,0,0,5" FontSize="11"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Slider Name="RewriteMaxTokensSlider"
+                                                Grid.Column="0"
+                                                Minimum="128"
+                                                Maximum="4096"
+                                                Value="1024"
+                                                TickFrequency="128"
+                                                IsSnapToTickEnabled="True"
+                                                TickPlacement="BottomRight"
+                                                Margin="0,0,10,0"
+                                                ValueChanged="RewriteMaxTokensSlider_ValueChanged"/>
+                                        <TextBlock Name="RewriteMaxTokensText"
+                                                   Grid.Column="1"
+                                                   Text="1024"
+                                                   FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   MinWidth="45"
+                                                   TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Maximum number of tokens the LLM will generate"
+                                               FontSize="10"
+                                               Foreground="Gray"
+                                               Margin="0,3,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </GroupBox>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- License Tab -->
             <TabItem Header="License">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
