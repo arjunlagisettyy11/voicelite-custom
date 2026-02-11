@@ -33,6 +33,7 @@ namespace VoiceLite.Services
 
             bool semaphoreAcquired = false;
             Process? process = null;
+            string? tempPromptFile = null;
 
             try
             {
@@ -49,7 +50,7 @@ namespace VoiceLite.Services
                 ErrorLogger.LogWarning($"LlamaRewrite: Starting rewrite with ollama model={model}");
                 var sw = Stopwatch.StartNew();
 
-                (process, var outputBuilder, var errorBuilder) = StartOllamaProcess(model, prompt);
+                (process, var outputBuilder, var errorBuilder, tempPromptFile) = StartOllamaProcess(model, prompt);
 
                 bool exited = await Task.Run(() => process.WaitForExit(PROCESS_TIMEOUT_SECONDS * 1000), linkedCts.Token);
                 sw.Stop();
@@ -102,6 +103,13 @@ namespace VoiceLite.Services
                     catch { }
                 }
 
+                // Clean up temp prompt file
+                if (tempPromptFile != null)
+                {
+                    try { File.Delete(tempPromptFile); }
+                    catch (Exception cleanupEx) { ErrorLogger.LogWarning($"Failed to delete temp prompt file: {cleanupEx.Message}"); }
+                }
+
                 if (semaphoreAcquired)
                 {
                     try { rewriteSemaphore.Release(); }
@@ -111,16 +119,22 @@ namespace VoiceLite.Services
             }
         }
 
-        private (Process process, StringBuilder outputBuilder, StringBuilder errorBuilder) StartOllamaProcess(string model, string prompt)
+        private (Process process, StringBuilder outputBuilder, StringBuilder errorBuilder, string tempPromptFile) StartOllamaProcess(string model, string prompt)
         {
             var ollamaPath = ResolveOllamaPath();
 
+            // Write prompt to a temp file to avoid Ollama's readline 2048-byte buffer panic.
+            // When stdin is piped directly, Ollama uses a Go readline library that panics on
+            // input lines exceeding 2048 bytes. Redirecting stdin from a file via cmd.exe
+            // bypasses readline entirely since Ollama detects non-interactive stdin.
+            var tempPromptFile = Path.Combine(Path.GetTempPath(), $"voicelite_prompt_{Guid.NewGuid():N}.txt");
+            File.WriteAllText(tempPromptFile, prompt, Encoding.UTF8);
+
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = ollamaPath,
-                Arguments = $"run {model}",
+                FileName = "cmd.exe",
+                Arguments = $"/c \"\"{ollamaPath}\" run {model} < \"{tempPromptFile}\"\"",
                 UseShellExecute = false,
-                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
@@ -159,11 +173,7 @@ namespace VoiceLite.Services
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            // Write prompt to stdin then close it so ollama knows input is complete
-            process.StandardInput.Write(prompt);
-            process.StandardInput.Close();
-
-            return (process, outputBuilder, errorBuilder);
+            return (process, outputBuilder, errorBuilder, tempPromptFile);
         }
 
         private string ResolveOllamaPath()

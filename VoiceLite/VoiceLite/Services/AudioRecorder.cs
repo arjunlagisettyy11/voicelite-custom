@@ -42,6 +42,12 @@ namespace VoiceLite.Services
         // Audio preprocessing settings (enabled by default for better transcription quality)
         private AudioPreprocessingSettings preprocessingSettings = new AudioPreprocessingSettings();
 
+        // Per-session mic warm-up: USB mics (e.g. Insta360 Link) enter low-power sleep after
+        // inactivity, causing empty 46-byte audio buffers. Warm up before each recording if
+        // enough time has elapsed since the last one.
+        private DateTime lastRecordingTime = DateTime.MinValue;
+        private const int WARMUP_COOLDOWN_SECONDS = 30;
+
         // Timing constants (in milliseconds)
         private const int NAUDIO_BUFFER_FLUSH_DELAY_MS = 10; // Minimal delay for NAudio buffer flush
         private const int STOP_COMPLETION_DELAY_MS = 10; // Brief pause to let stop complete
@@ -317,6 +323,13 @@ namespace VoiceLite.Services
 
                 try
                 {
+                    // Warm up mic if idle for too long - USB mics enter low-power sleep
+                    if ((DateTime.UtcNow - lastRecordingTime).TotalSeconds > WARMUP_COOLDOWN_SECONDS)
+                    {
+                        ErrorLogger.LogWarning($"StartRecording: Mic idle >{WARMUP_COOLDOWN_SECONDS}s, running warm-up");
+                        WarmUpMicrophone();
+                    }
+
                     // CRITICAL FIX: ALWAYS dispose and recreate waveIn for EACH recording session
                     // This is the ONLY way to guarantee no buffered audio from previous sessions can leak
                     DisposeWaveInCompletely();
@@ -544,6 +557,9 @@ namespace VoiceLite.Services
 
                             if (audioData.Length > 100) // Only process if there's actual audio
                             {
+                                // Track successful recording time for mic warm-up cooldown
+                                lastRecordingTime = DateTime.UtcNow;
+
                                 ErrorLogger.LogWarning($"StopRecording: CALLING SaveMemoryBufferToTempFile with {audioData.Length} bytes");
 
                                 // Notify listeners with the audio data
